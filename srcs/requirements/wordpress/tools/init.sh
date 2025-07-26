@@ -1,6 +1,16 @@
 #!/bin/sh
 set -e
 
+if [ -n "$WORDPRESS_DATABASE_PASSWORD_FILE" ]; then
+    WORDPRESS_DATABASE_PASSWORD=$(cat "$WORDPRESS_DATABASE_PASSWORD_FILE")
+fi
+if [ -n "$WORDPRESS_ADMIN_PASSWORD_FILE" ]; then
+    WORDPRESS_ADMIN_PASSWORD=$(cat "$WORDPRESS_ADMIN_PASSWORD_FILE")
+fi
+if [ -n "$WORDPRESS_USER_PASSWORD_FILE" ]; then
+    WORDPRESS_USER_PASSWORD=$(cat "$WORDPRESS_USER_PASSWORD_FILE")
+fi
+
 # This script only runs the first time the container starts.
 if [ ! -f "/var/www/html/wp-config.php" ]; then
     echo "==> Waiting for MariaDB..."

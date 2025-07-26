@@ -16,14 +16,12 @@ all: setup
 	@echo "🚀 Building and starting Inception services..."
 	@docker-compose -f srcs/docker-compose.yml --project-name $(PROJECT_NAME) up --build -d
 
-# Builds (or rebuilds) the Docker images for all services without starting them.
-# Useful for development when you only want to update the images.
+# Add setup as a dependency here
 build: setup
 	@echo "🔧 Building Docker images..."
 	@docker-compose -f srcs/docker-compose.yml --project-name $(PROJECT_NAME) build
 
-# Starts the containers without rebuilding the images.
-# This is faster if the images are already up-to-date.
+# Add setup as a dependency here
 up: setup
 	@echo "🚀 Launching containers..."
 	@docker-compose -f srcs/docker-compose.yml --project-name $(PROJECT_NAME) up -d

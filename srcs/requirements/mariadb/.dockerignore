@@ -1,0 +1,10 @@
+# Ignore Git-related files
+.git
+.gitignore
+
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore IDE-related files
+.idea/
+*.iml

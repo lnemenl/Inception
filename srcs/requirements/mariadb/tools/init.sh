@@ -3,6 +3,13 @@
 
 set -e # Exit immediately if any command fails.
 
+if [ -n "$MYSQL_ROOT_PASSWORD_FILE" ]; then
+    MYSQL_ROOT_PASSWORD=$(cat "$MYSQL_ROOT_PASSWORD_FILE")
+fi
+if [ -n "$WORDPRESS_DATABASE_PASSWORD_FILE" ]; then
+    WORDPRESS_DATABASE_PASSWORD=$(cat "$WORDPRESS_DATABASE_PASSWORD_FILE")
+fi
+
 # These commands MUST run every time the container starts.
 # The /run/mysqld directory is temporary and is needed for the socket file.
 # It is NOT part of the persistent volume.

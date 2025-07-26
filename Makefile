@@ -76,7 +76,23 @@ setup:
 		./setup.sh; \
 	fi
 
+
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all       Builds and starts all services (default)."
+	@echo "  build     Builds the Docker images."
+	@echo "  up        Starts the services."
+	@echo "  down      Stops the services."
+	@echo "  re        Rebuilds and restarts the entire project."
+	@echo "  logs      Tails the logs from all services."
+	@echo "  status    Shows the status of all services."
+	@echo "  clean     Stops and removes containers."
+	@echo "  fclean    Removes all containers, networks, volumes, and the .env file."
+	@echo "  help      Shows this help message."
+
 # .PHONY tells Make that these are not actual files.
 # This prevents Make from getting confused if a file with the same name exists,
 # and it can help with performance.
-.PHONY: all build up down re logs status clean fclean setup
+.PHONY: all build up down re logs status clean fclean setup help

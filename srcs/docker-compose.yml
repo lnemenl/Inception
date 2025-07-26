@@ -1,0 +1,101 @@
+# Inception Project: Docker Compose Configuration
+
+services:
+  # --- MariaDB Service ---
+  # The database container for our WordPress site.
+  mariadb:
+    # Specifies the Dockerfile and its location for building this service's image.
+    build:
+      context: ./requirements/mariadb
+    # A custom, human-readable name for the container.
+    container_name: mariadb
+    # Loads environment variables from the .env file.
+    # This is how we pass the secret passwords to the container.
+    env_file: .env
+    # Defines the network this service will connect to, enabling communication
+    # with other services on the same network.
+    networks:
+      - inception
+    # Mounts a named volume to persist the database data.
+    # This ensures that even if the container is removed, the data remains.
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    # 'on-failure' ensures the container will restart automatically if it crashes.
+    restart: on-failure
+    # The healthcheck defines a command to check if the database is responsive.
+    # Docker uses this to determine if the service is healthy.
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping --socket=/run/mysqld/mysqld.sock -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --- WordPress Service ---
+  # The application container running WordPress with PHP-FPM.
+  wordpress:
+    build:
+      context: ./requirements/wordpress
+    container_name: wordpress
+    env_file: .env
+    networks:
+      - inception
+    # This volume persists all WordPress files, including themes, plugins, and uploads.
+    volumes:
+      - wordpress_data:/var/www/html
+    # This critical directive tells Docker to wait for the `mariadb` service
+    # to be reported as 'healthy' before starting this container.
+    # This prevents WordPress from failing if it starts before the database is ready.
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: on-failure
+    # The healthcheck uses netcat to simply check if the PHP-FPM service is
+    # listening on its port. This is a very reliable and simple check.
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --- Nginx Service ---
+  # The web server container, acting as a reverse proxy and the only entrypoint.
+  nginx:
+    build:
+      context: ./requirements/nginx
+    container_name: nginx
+    env_file: .env
+    networks:
+      - inception
+    # This directive maps port 443 on the host machine to port 443 in the container.
+    # This is how external traffic reaches the Nginx server.
+    ports:
+      - "443:443"
+    # Mounts the WordPress files volume as read-only (`:ro`).
+    # This is a security best practice: Nginx only needs to read the files,
+    # not write to them.
+    volumes:
+      - wordpress_data:/var/www/html:ro
+    # Nginx will only start after the WordPress container has been created.
+    # It does not wait for it to be healthy, as Nginx can start independently.
+    depends_on:
+      - wordpress
+    restart: on-failure
+
+# --- Global Configurations ---
+
+# Defines the custom bridge network that all our services will use.
+# Using a custom network is a security best practice, as it isolates the
+# containers from other projects on the same Docker host.
+networks:
+  inception:
+    driver: bridge
+    name: inception_network
+
+# Defines the named volumes used for data persistence.
+# Docker manages the storage of these volumes on the host machine,
+# which is the most portable and reliable way to handle persistent data.
+volumes:
+  mariadb_data:
+  wordpress_data:

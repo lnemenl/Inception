@@ -1,0 +1,79 @@
+# Inception Project: Nginx Master Configuration
+
+# The user the Nginx worker processes will run as.
+user nginx;
+# 'auto' automatically detects the number of available CPU cores.
+worker_processes auto;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    # Include standard MIME types for file extensions.
+    include /etc/nginx/mime.types;
+    # Default content type if the file extension is unknown.
+    default_type application/octet-stream;
+    # More efficient file sending.
+    sendfile on;
+    # Keep connections open for a short time to improve performance.
+    keepalive_timeout 65;
+
+    # --- Server Block 1: HTTP to HTTPS Redirect ---
+    # This server block listens on port 80 (HTTP) and its only purpose is to
+    # redirect all traffic to HTTPS. This is a security best practice.
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name ${DOMAIN_NAME};
+        # Return a 301 (Permanent Redirect) status code to the browser.
+        return 301 https://$host$request_uri;
+    }
+
+    # --- Server Block 2: Main HTTPS Server ---
+    # This is the main server that handles all secure traffic for the site.
+    server {
+        # Listen on port 443 for both IPv4 and IPv6 traffic, using SSL/TLS.
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        server_name ${DOMAIN_NAME};
+
+        # Root directory for website files. This is the volume shared with WordPress.
+        root /var/www/html;
+        # Default files to look for when a directory is requested.
+        index index.php index.html;
+
+        # --- SSL/TLS Configuration ---
+        ssl_certificate /etc/nginx/ssl/public.crt;
+        ssl_certificate_key /etc/nginx/ssl/private.key;
+        # Enforce modern, secure TLS protocols as required by the subject.
+        ssl_protocols TLSv1.2 TLSv1.3;
+        # Use a strong set of cipher suites for encryption.
+        ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+
+        # --- Location Blocks ---
+
+        # The main location block for handling most requests.
+        # It tries to find a file at the requested URI. If not found, it tries
+        # to treat it as a directory, and if that fails, it passes the request
+        # to WordPress's index.php to handle dynamic routing.
+        location / {
+            try_files $uri $uri/ /index.php?$args;
+        }
+
+        # This block handles all requests for .php files.
+        location ~ \.php$ {
+            include fastcgi_params;
+            # Forward the request to the WordPress container on port 9000.
+            fastcgi_pass wordpress:9000;
+            fastcgi_index index.php;
+            # This line tells PHP-FPM which script file to execute.
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        }
+
+        # Deny access to sensitive files for security.
+        location ~* \.(env|git|htaccess|log|sh|sql|tpl|ini)$ {
+            deny all;
+        }
+    }
+}

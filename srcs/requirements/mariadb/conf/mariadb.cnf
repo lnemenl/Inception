@@ -1,0 +1,19 @@
+# Inception Project: MariaDB Configuration
+
+[mysqld]
+# The user the MariaDB process will run as. Running as a non-root user is a security best practice.
+user = mysql
+
+# The directory where the database files will be stored.
+# This path points to the location of our persistent Docker volume.
+datadir = /var/lib/mysql
+
+# The location of the socket file for local connections.
+socket = /run/mysqld/mysqld.sock
+
+# The network port to listen on.
+port = 3306
+
+# Listen on all network interfaces (0.0.0.0) inside the container.
+# This is required so that other containers (like WordPress) can connect to it.
+bind-address = 0.0.0.0

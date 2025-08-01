@@ -3,7 +3,10 @@
 FROM alpine:3.20 AS builder
 
 # Install wget and download WP-CLI.
-RUN apk add --no-cache wget && \
+# In the builder stage
+RUN sed -i 's/https/http/g' /etc/apk/repositories && \
+    apk update && \
+    apk add --no-cache wget && \
     wget -q https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /wp-cli.phar
 
 # --- Final Stage ---
@@ -11,8 +14,10 @@ RUN apk add --no-cache wget && \
 FROM alpine:3.20
 
 # Only install the packages absolutely required for running the application.
-# Notice that `wget` is not needed here.
-RUN apk add --no-cache \
+
+RUN sed -i 's/https/http/g' /etc/apk/repositories && \
+    apk update && \
+    apk add --no-cache \
     php83 \
     php83-fpm \
     php83-mysqli \

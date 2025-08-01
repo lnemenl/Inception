@@ -1,16 +1,12 @@
-# Inception Project: Docker Compose Configuration
-
 services:
   mariadb:
     build:
       context: ./requirements/mariadb
     container_name: mariadb
     env_file: .env
-    # We now pass the path to the secret files via environment variables.
     environment:
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
       WORDPRESS_DATABASE_PASSWORD_FILE: /run/secrets/db_password
-    # This makes the secrets available inside the container at the specified paths.
     secrets:
       - db_root_password
       - db_password
@@ -20,19 +16,18 @@ services:
       - mariadb_data:/var/lib/mysql
     restart: on-failure
     healthcheck:
-      # The healthcheck now reads the password from the secret file.
       test: ["CMD-SHELL", "mariadb-admin ping --socket=/run/mysqld/mysqld.sock -u root -p$$(cat $$MYSQL_ROOT_PASSWORD_FILE)"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      # Increase the grace period to 3 minutes to allow for slow startup.
+      start_period: 180s
 
   wordpress:
     build:
       context: ./requirements/wordpress
     container_name: wordpress
     env_file: .env
-    # Pass the paths to the secret files to the WordPress container.
     environment:
       WORDPRESS_DATABASE_PASSWORD_FILE: /run/secrets/db_password
       WORDPRESS_ADMIN_PASSWORD_FILE: /run/secrets/wp_admin_password
@@ -45,6 +40,7 @@ services:
       - inception
     volumes:
       - wordpress_data:/var/www/html
+    # This is the correct syntax for waiting on the healthcheck.
     depends_on:
       mariadb:
         condition: service_healthy
@@ -67,6 +63,7 @@ services:
       - "443:443"
     volumes:
       - wordpress_data:/var/www/html:ro
+    # This is the simple dependency form, which is sufficient here.
     depends_on:
       - wordpress
     restart: on-failure
@@ -78,9 +75,19 @@ networks:
 
 volumes:
   mariadb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/rkhakimu/data/mariadb
   wordpress_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/rkhakimu/data/wordpress
 
-# Top-level secrets block tells Docker where to find the secret files on the host.
+
 secrets:
   db_root_password:
     file: ./secrets/db_root_password.txt

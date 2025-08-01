@@ -62,6 +62,7 @@ fclean:
 	@echo "🗑️ Removing all containers, networks, volumes, and .env file..."
 	-@docker-compose -f srcs/docker-compose.yml --project-name $(PROJECT_NAME) down -v --remove-orphans
 	@rm -f srcs/.env
+	@sudo  rm -rf srcs/secrets ../data
 	@echo "✅ Project completely cleaned."
 
 # --- Helper Targets ---
@@ -71,7 +72,7 @@ fclean:
 setup:
 	@# This check prevents the setup script from running if the .env file already exists.
 	@if [ ! -f srcs/.env ]; then \
-		./setup.sh; \
+		/bin/sh setup.sh; \
 	fi
 
 

@@ -4,7 +4,10 @@
 FROM alpine:3.20
 
 # Install Nginx, OpenSSL (for certificate generation), and gettext (for `envsubst`).
-RUN apk add --no-cache nginx openssl gettext
+# Switch to HTTP repositories, update, and install packages in a single layer.
+RUN sed -i 's/https/http/g' /etc/apk/repositories && \
+    apk update && \
+    apk add --no-cache nginx openssl gettext
 
 # Create the directory where Nginx runtime files will be stored.
 RUN mkdir -p /run/nginx

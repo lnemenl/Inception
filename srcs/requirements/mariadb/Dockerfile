@@ -11,7 +11,10 @@ FROM alpine:3.20
 # `--no-cache` is a best practice that downloads the package index, installs
 # the packages, and then discards the index, all in a single layer.
 # This significantly reduces the image size.
-RUN apk add --no-cache mariadb mariadb-client
+# Switch to HTTP repositories, update, and install packages in a single layer.
+RUN sed -i 's/https/http/g' /etc/apk/repositories && \
+    apk update && \
+    apk add --no-cache mariadb mariadb-client
 
 # Copy the custom MariaDB configuration file into the image.
 # This file will tell the server how to behave (e.g., where to store data).

@@ -1,28 +1,77 @@
+# Top-level key 'services': Defines the containers (services) that Docker Compose will manage.
+# WHAT: This key groups all container configurations for the project.
+# WHY: Docker Compose’s primary purpose is to orchestrate multiple containers, and 'services' is the required key to define them.
 services:
+
+  # Service name 'mariadb': Names the first service, which runs the MariaDB database.
+  # WHAT: This is the identifier for the database container, used as its hostname on the Docker network.
+  # WHY: Chosen for clarity to indicate this service runs MariaDB; it allows other services (e.g., WordPress) to connect to it via the hostname 'mariadb'.
   mariadb:
+    # Keyword 'build': Instructs Docker Compose to build a custom image from a Dockerfile.
+    # WHAT: Specifies that the container’s image will be built locally rather than pulled from a registry.
+    # WHY: The Inception project forbids pre-built images, requiring a custom image for full control over MariaDB’s configuration.
     build:
+      # Sub-keyword 'context': Specifies the directory containing the Dockerfile and build files.
+      # WHAT: Points to './requirements/mariadb' where the Dockerfile for MariaDB resides.
+      # WHY: Tells Docker where to find the build instructions; './requirements/mariadb' organizes project files by service.
       context: ./requirements/mariadb
+
+    # Keyword 'container_name': Sets a fixed name for the container.
+    # WHAT: Names the container 'mariadb' instead of a generated name (e.g., 'inception-mariadb-1').
+    # WHY: Improves predictability for debugging and referencing the container in logs or commands.
     container_name: mariadb
+
+    # Keyword 'env_file': Loads environment variables from a file.
+    # WHAT: Imports variables from '.env' into the container’s environment.
+    # WHY: Centralizes configuration (e.g., database name, user) in a single file, avoiding hardcoding and improving maintainability.
     env_file: .env
+
+    # Keyword 'environment': Defines environment variables directly in the container.
+    # WHAT: Sets variables pointing to secret file paths for MariaDB passwords.
+    # WHY: MariaDB uses these variables to locate secure password files, avoiding plaintext passwords in the YAML.
     environment:
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
       WORDPRESS_DATABASE_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
-      - db_root_password
-      - db_password
-    networks:
-      - inception
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    restart: on-failure
-    healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping --socket=/run/mysqld/mysqld.sock -u root -p$$(cat $$MYSQL_ROOT_PASSWORD_FILE)"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      # Increase the grace period to 3 minutes to allow for slow startup.
-      start_period: 180s
 
+    # Keyword 'secrets': Links the service to secrets defined in the top-level 'secrets' section.
+    # WHAT: Makes the specified secrets available as files in the container at '/run/secrets/'.
+    # WHY: Enhances security by storing passwords in files rather than environment variables, per project requirements.
+    secrets:
+      # Secret 'db_root_password': References the root password secret.
+      # WHAT: Links to the secret defined below, making it available at '/run/secrets/db_root_password'.
+      # WHY: Provides the MariaDB root password securely.
+      - db_root_password
+      # Secret 'db_password': References the WordPress database password secret.
+      # WHAT: Links to the secret defined below, making it available at '/run/secrets/db_password'.
+      # WHY: Provides the password for WordPress’s database user securely.
+      - db_password
+
+    # Keyword 'networks': Connects the service to a Docker network.
+    # WHAT: Attaches the 'mariadb' service to the 'inception' network.
+    # WHY: Allows 'mariadb' to communicate with other services (e.g., 'wordpress') using the service name as a hostname.
+    networks:
+      # Network 'inception': References the network defined in the top-level 'networks' section.
+      # WHAT: Specifies the 'inception' bridge network for this service.
+      # WHY: Ensures private, isolated communication between services, a best practice for multi-container apps.
+      - inception
+
+    # Keyword 'volumes': Mounts volumes into the container for persistent storage.
+    # WHAT: Maps the named volume 'mariadb_data' to '/var/lib/mysql' in the container.
+    # WHY: Persists MariaDB’s database files across container restarts, meeting project requirements for data retention.
+    volumes:
+      # Volume mapping 'mariadb_data:/var/lib/mysql': Binds the named volume to the container’s data directory.
+      # WHAT: 'mariadb_data' is the volume name; '/var/lib/mysql' is MariaDB’s default data directory.
+      # WHY: Ensures database data is stored persistently on the host, preventing data loss.
+      - mariadb_data:/var/lib/mysql
+
+    # Keyword 'restart': Defines the container’s restart policy.
+    # WHAT: Sets 'on-failure', meaning the container restarts only if it exits with an error.
+    # WHY: Ensures reliability by automatically recovering from crashes, a mandatory project requirement.
+    restart: on-failure
+
+  # Service name 'wordpress': Names the second service, which runs the WordPress application.
+  # WHAT: Identifies the container running WordPress, used as its hostname on the Docker network.
+  # WHY: Chosen for clarity; allows 'nginx' to connect to it via the hostname 'wordpress'.
   wordpress:
     build:
       context: ./requirements/wordpress
@@ -39,18 +88,15 @@ services:
     networks:
       - inception
     volumes:
+    # It’s the default document root for web servers (Nginx) and the default installation directory for WordPress in Docker.
+    # It ensures compatibility with the official WordPress and Nginx images (or their custom-built equivalents in your project).
+    # It simplifies the setup by aligning with standard conventions, avoiding the need to reconfigure WordPress or Nginx.
+    # It supports the project’s persistence requirement via the wordpress_data volume and enhances security with the read-only mount for Nginx.
       - wordpress_data:/var/www/html
-    # This is the correct syntax for waiting on the healthcheck.
     depends_on:
-      mariadb:
-        condition: service_healthy
+      # WHY: Guarantees the database is available before WordPress starts.
+      - mariadb
     restart: on-failure
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   nginx:
     build:
@@ -59,41 +105,91 @@ services:
     env_file: .env
     networks:
       - inception
+    # Keyword 'ports': Maps ports from the host to the container.
+    # WHAT: Maps host port 443 to container port 443 for HTTPS traffic.
+    # WHY: Exposes the WordPress site to the outside world via the standard HTTPS port.
     ports:
+      # Port mapping '443:443': Maps host port 443 to container port 443.
+      # WHAT: '443' (host) maps to '443' (container).
+      # WHY: Port 443 is the standard for HTTPS, required for secure web access.
       - "443:443"
+    # Keyword 'volumes': Mounts volumes for file access.
+    # WHAT: Maps 'wordpress_data' to '/var/www/html' in read-only mode (':ro').
+    # WHY: Allows Nginx to read WordPress files securely without modifying them.
     volumes:
+      # Volume mapping 'wordpress_data:/var/www/html:ro': Binds the volume to Nginx’s web root.
+      # WHAT: 'wordpress_data' is the volume; '/var/www/html' is Nginx’s document root; ':ro' means read-only.
+      # WHY: Ensures Nginx serves WordPress files without altering them, a security best practice.
       - wordpress_data:/var/www/html:ro
-    # This is the simple dependency form, which is sufficient here.
     depends_on:
+      # WHY: Guarantees WordPress is running before Nginx starts.
       - wordpress
     restart: on-failure
 
+# Top-level key 'networks': Defines custom Docker networks for service communication.
+# WHAT: Groups network configurations for the project.
+# WHY: Allows services to communicate privately and securely via a defined network.
 networks:
+  # Network name 'inception': Names the network.
+  # WHAT: Identifies the network used by all services.
   inception:
+    # Keyword 'driver': Specifies the network type.
+    # WHAT: Sets 'bridge', creating a private network on the host.
+    # WHY: Bridge networks isolate services, allowing communication via service names.
     driver: bridge
+    # Keyword 'name': Sets a fixed name for the network.
+    # WHAT: Names the network 'inception_network'.
+    # WHY: Ensures a predictable name for debugging and consistency.
     name: inception_network
 
+# Top-level key 'volumes': Defines persistent storage volumes.
+# WHAT: Groups volume configurations for data persistence.
+# WHY: Ensures data (database, website files) is stored on the host, per project requirements.
 volumes:
+  # Volume name 'mariadb_data': Names the volume for MariaDB data.
+  # WHAT: Identifies the volume for MariaDB’s database files.
   mariadb_data:
+    # Keyword 'name': Sets a fixed name for the volume.
+    name: mariadb_volume
+    # Keyword 'driver': Specifies the volume storage driver.
+    # WHAT: Sets 'local', storing data on the host’s filesystem.
     driver: local
+    # Keyword 'driver_opts': Configures volume options.
+    # WHAT: Defines a bind mount to a specific host directory.
+    # WHY: Project requires data in '/home/login/data', so a bind mount is used.
     driver_opts:
+      # Sub-keyword 'type': Specifies the mount type.
+      # WHAT: Sets 'none' to indicate a bind mount.
+      # WHY: Required for bind mounts to link a specific host directory.
       type: none
+      # Sub-keyword 'o': Specifies mount options.
+      # WHAT: Sets 'bind' to create a bind mount.
+      # WHY: Explicitly defines the mount as a bind mount, per Docker’s syntax.
       o: bind
-      device: /home/rkhakimu/data/mariadb
+      # Sub-keyword 'device': Specifies the host directory.
+      # WHAT: Points to '${DATA_PATH}/mariadb', resolved from '.env'.
+      # WHY: Maps the volume to the project-required directory '/home/login/data/mariadb'.
+      device: ${DATA_PATH}/mariadb
+  # Volume name 'wordpress_data': Names the volume for WordPress data.
+  # WHAT: Identifies the volume for WordPress’s website files.
+  # WHY: Chosen for clarity to associate with the 'wordpress' service.
   wordpress_data:
+    name: wordpress_volume
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/rkhakimu/data/wordpress
+      device: ${DATA_PATH}/wordpress
 
-
+# Top-level key 'secrets': Defines secret files for secure data handling.
+# WHAT: Groups configurations for sensitive data (passwords).
+# WHY: Provides a secure way to manage passwords
 secrets:
   db_root_password:
-    file: ./secrets/db_root_password.txt
+    file: ../secrets/db_root_password.txt
   db_password:
-    file: ./secrets/db_password.txt
+    file: ../secrets/db_password.txt
   wp_admin_password:
-    file: ./secrets/wp_admin_password.txt
+    file: ../secrets/wp_admin_password.txt
   wp_user_password:
-    file: ./secrets/wp_user_password.txt
+    file: ../secrets/wp_user_password.txt

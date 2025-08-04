@@ -4,7 +4,7 @@
 # Use a specific, stable version of Alpine Linux as the base image.
 # Alpine is chosen for its small size, which results in a faster build
 # and a more secure, minimal final image.
-FROM alpine:3.20
+FROM alpine:3.19
 
 # Install the MariaDB server and client packages.
 # `apk add` is Alpine's package manager.
@@ -16,8 +16,11 @@ RUN sed -i 's/https/http/g' /etc/apk/repositories && \
     apk update && \
     apk add --no-cache mariadb mariadb-client
 
-# Copy the custom MariaDB configuration file into the image.
-# This file will tell the server how to behave (e.g., where to store data).
+# `COPY`: This command copies files from the build context (your host machine)
+#   into the filesystem of the Docker image.
+#   - `conf/mariadb.cnf`: The source file on your host.
+#   - `/etc/my.cnf`: The destination path inside the image. This is the standard
+#     location for the MariaDB configuration file.
 COPY conf/mariadb.cnf /etc/my.cnf
 
 # Copy the initialization script. This script will set up the database

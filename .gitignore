@@ -1,3 +1,9 @@
-.env
+# Generated configuration and secrets
 srcs/.env
-srcs/secrets/
+secrets/
+
+# Local data directory
+data/
+
+# macOS system files
+.DS_Store

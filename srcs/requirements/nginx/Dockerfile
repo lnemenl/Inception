@@ -1,27 +1,20 @@
-# Inception Project: Nginx Service Dockerfile
-# This Dockerfile builds the image for the Nginx web server.
+FROM alpine:3.19
 
-FROM alpine:3.20
-
-# Install Nginx, OpenSSL (for certificate generation), and gettext (for `envsubst`).
-# Switch to HTTP repositories, update, and install packages in a single layer.
+# Install the Nginx server, OpenSSL (for generating SSL certificates),
+# and `gettext` (which provides the `envsubst` utility used for configuration templating).
 RUN sed -i 's/https/http/g' /etc/apk/repositories && \
     apk update && \
     apk add --no-cache nginx openssl gettext
 
-# Create the directory where Nginx runtime files will be stored.
+# Create a directory for Nginx to store its runtime files, like its process ID.
 RUN mkdir -p /run/nginx
-
-# Copy all necessary files into the image.
+# Copy the configuration template and all necessary scripts into the image.
 COPY conf/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY tools/generate-certs.sh /usr/local/bin/generate-certs.sh
 COPY tools/entrypoint.sh /usr/local/bin/entrypoint.sh
-
-# Make all scripts executable.
+# Make all the scripts executable.
 RUN chmod +x /usr/local/bin/generate-certs.sh /usr/local/bin/entrypoint.sh
-
-# Expose the HTTPS port.
+# Document that the container listens on the standard HTTPS port.
 EXPOSE 443
-
-# Set the entrypoint to our new script, which handles all setup.
+# Set the main command to run when the container starts.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

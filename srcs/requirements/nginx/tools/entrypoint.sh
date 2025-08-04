@@ -1,23 +1,21 @@
 #!/bin/sh
-# Inception Project: Nginx Entrypoint Script
-
-set -e # Exit immediately if any command fails.
-
-# 1. Generate SSL Certificates
-# This calls another script to create the self-signed certificate and key
-# if they don't already exist.
+set -e
+# 1. Call the other script to generate the self-signed SSL certificate.
+#    This is done first to ensure the certificate exists before Nginx starts.
 /usr/local/bin/generate-certs.sh
-
-# 2. Substitute Environment Variables
-# This command takes the nginx.conf.template, replaces any shell variables
-# (like ${DOMAIN_NAME}) with their actual values from the environment,
-# and creates the final nginx.conf file that Nginx will use.
+# 2. This command performs the configuration templating.
+#    - `envsubst '${DOMAIN_NAME}'`: This utility reads from standard input and
+#      replaces any shell variable placeholders (like `${DOMAIN_NAME}`) with their
+#      actual values from the environment.
+#    - `< /etc/nginx/nginx.conf.template`: Redirects the content of the template file
+#      to be the standard input for `envsubst`.
+#    - `> /etc/nginx/nginx.conf`: Redirects the final output (the processed config)
+#      into the real configuration file that Nginx will use.
 envsubst '${DOMAIN_NAME}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
-
-# 3. Start Nginx Server
-# Use `exec` to replace this script's process with the Nginx process.
-# This makes Nginx the main process (PID 1) of the container.
-# The `-g 'daemon off;'` directive tells Nginx to run in the foreground,
-# which is essential for Docker containers.
+# 3. Use `exec` to make Nginx the main process (PID 1) of the container.
+#    - `nginx -g 'daemon off;'`: Starts the Nginx server.
+#    - `-g 'daemon off;'`: This is a crucial directive that tells Nginx to run in the
+#      FOREGROUND. This is required for Docker, as it would otherwise "daemonize"
+#      (run in the background) and cause the container to exit.
 echo "==> Starting Nginx..."
 exec nginx -g 'daemon off;'

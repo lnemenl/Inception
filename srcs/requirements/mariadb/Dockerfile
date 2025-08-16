@@ -1,39 +1,34 @@
-# Inception Project: MariaDB Service Dockerfile
-# This Dockerfile builds the image for the MariaDB database server.
+# -----------------------------------------------------------------------------
+# This Dockerfile builds a minimal, custom MariaDB image. It installs the
+# database server and sets up our custom configuration and initialization script.
+# -----------------------------------------------------------------------------
 
-# Use a specific, stable version of Alpine Linux as the base image.
-# Alpine is chosen for its small size, which results in a faster build
-# and a more secure, minimal final image.
+# Use Alpine Linux as the base for a small and secure final image.
 FROM alpine:3.19
 
-# Install the MariaDB server and client packages.
-# `apk add` is Alpine's package manager.
-# `--no-cache` is a best practice that downloads the package index, installs
-# the packages, and then discards the index, all in a single layer.
-# This significantly reduces the image size.
-# Switch to HTTP repositories, update, and install packages in a single layer.
+# --- Install Packages ---
+# WHAT FOR: To install the MariaDB server and the client tools. The client is
+#           useful for the initialization script and for manual debugging.
+#           The '--no-cache' flag reduces the final image size by discarding
+#           the package cache after installation.
 RUN sed -i 's/https/http/g' /etc/apk/repositories && \
     apk update && \
     apk add --no-cache mariadb mariadb-client
 
-# `COPY`: This command copies files from the build context (your host machine)
-#   into the filesystem of the Docker image.
-#   - `conf/mariadb.cnf`: The source file on your host.
-#   - `/etc/my.cnf`: The destination path inside the image. This is the standard
-#     location for the MariaDB configuration file.
+# Copy our custom MariaDB server configuration into the standard location
+# within the image, overriding the default settings.
 COPY conf/mariadb.cnf /etc/my.cnf
 
-# Copy the initialization script. This script will set up the database
-# on the first run.
+# Copy the initialization script that will set up and run the database.
 COPY tools/init.sh /usr/local/bin/init.sh
 
-# Make the initialization script executable so that it can be run.
+# Make the initialization script executable.
 RUN chmod +x /usr/local/bin/init.sh
 
-# Expose the default MariaDB port. This is for documentation and container linking.
-# It doesn't publish the port to the host machine; the `docker-compose.yml` handles that.
+# Document that the container exposes the standard MariaDB port. This is used
+# for inter-container communication, not for exposing to the host.
 EXPOSE 3306
 
-# Set the entrypoint for the container. When the container starts, it will
-# execute this script. The script is responsible for starting the MariaDB server.
+# Set our custom script as the container's entrypoint. This script will handle
+# the database initialization before starting the main server process.
 ENTRYPOINT ["/usr/local/bin/init.sh"]

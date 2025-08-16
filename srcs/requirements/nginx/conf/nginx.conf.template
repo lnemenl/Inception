@@ -1,98 +1,82 @@
-# `user nginx;`: This directive specifies the system user account that the Nginx
-#   worker processes will run as. Running as an unprivileged user (`nginx`) instead of
-#   `root` is a critical security practice (Principle of Least Privilege).
-user nginx;
+# -----------------------------------------------------------------------------
+# This file is a template for the main Nginx configuration. The entrypoint
+# script will use 'envsubst' to replace ${DOMAIN_NAME} with its actual value,
+# generating the final 'nginx.conf' file used by the server.
+# -----------------------------------------------------------------------------
 
-# `worker_processes auto;`: This controls how many worker processes Nginx will spawn
-#   to handle incoming requests. Each worker can handle many connections.
-#   Setting it to `auto` is a best practice that tells Nginx to automatically detect
-#   the number of available CPU cores and create one worker for each core.
+# Run worker processes as the unprivileged 'nginx' user for security.
+user nginx;
+# Automatically set the number of worker processes to the number of CPU cores.
 worker_processes auto;
 
-# The `events` block contains directives related to network connection processing.
+# Configures network connection handling settings.
 events {
-    # `worker_connections 1024;`: Sets the maximum number of simultaneous connections
-    #   that each worker process can handle.
+    # Max simultaneous connections per worker process.
     worker_connections 1024;
 }
 
-# The `http` block defines the configuration for handling HTTP and HTTPS traffic.
+# Defines the configuration for HTTP/HTTPS traffic.
 http {
-    # `include /etc/nginx/mime.types;`: This includes a file that maps file extensions
-    #   (like .css, .jpg, .js) to their corresponding MIME types. This tells the browser
-    #   how to correctly interpret the files it receives.
+    # Include a map of file extensions to MIME types.
     include /etc/nginx/mime.types;
-
-    # `default_type ...;`: If Nginx encounters a file with an unknown extension,
-    #   it will use this default MIME type.
+    # Default MIME type for files with unknown extensions.
     default_type application/octet-stream;
 
-    # `sendfile on;`: A performance optimization. It allows Nginx to copy data
-    #   directly from the file on disk to the network socket, which is much more
-    #   efficient than reading it into the application's memory first.
+    # --- Performance Optimizations ---
+    # Enables efficient file transfer directly from the kernel.
     sendfile on;
-
-    # `keepalive_timeout 65;`: A performance optimization. It tells Nginx to keep a
-    #   connection to a browser open for 65 seconds after a request is finished.
-    #   This allows the browser to make subsequent requests without the overhead
-    #   of re-establishing the network connection.
+    # Allows a single connection to remain open for multiple requests.
     keepalive_timeout 65;
 
-    # This is the main `server` block that handles all secure traffic for your website.
+    # --- Virtual Server Definition ---
+    # This block defines the configuration for our WordPress site.
     server {
-        # `listen 443 ssl;`: Listen on port 443 (the standard HTTPS port) and enable
-        #   the SSL/TLS protocol for all connections on this port.
+        # Listen for incoming HTTPS traffic on port 443 for both IPv4 and IPv6.
         listen 443 ssl;
         listen [::]:443 ssl;
+
+        # The domain name this server block will respond to.
+        # This is a placeholder that will be replaced by the entrypoint script.
         server_name ${DOMAIN_NAME};
 
-        # `root /var/www/html;`: The "document root". This is the directory on the
-        #   filesystem where Nginx will look for the website's files.
-        root /var/www/html;
-
-        # `index ...;`: If a user requests a directory (e.g., yoursite.com/), Nginx will
-        #   look for these files in this order inside that directory.
-        index index.php index.html;
-
         # --- SSL/TLS Configuration ---
-
-        # `ssl_certificate ...;`: Specifies the path to your public SSL certificate file.
+        # Defines the location of the SSL certificate and private key.
         ssl_certificate /etc/nginx/ssl/public.crt;
-        # `ssl_certificate_key ...;`: Specifies the path to your private key file.
         ssl_certificate_key /etc/nginx/ssl/private.key;
-
-        # `ssl_protocols ...;`: This is a MANDATORY security requirement from the project
-        #   subject. It restricts the server to using only modern, secure TLS protocols.
+        # Enforce strong, modern TLS protocols as required by the project.
         ssl_protocols TLSv1.2 TLSv1.3;
 
-        # --- Location Blocks ---
-        # Nginx processes requests by matching them against `location` blocks.
+        # The root directory where website files are located. This path points
+        # to the shared volume mounted from the WordPress container.
+        root /var/www/html;
+        # Defines the default files to serve if a directory is requested.
+        index index.php index.html;
 
-        # `location /`: This is the default block that catches all requests.
-        # `try_files ...`: This is the key to making WordPress's "pretty permalinks" work.
-        #   1. It first tries to find a file at the exact requested path (`$uri`).
-        #   2. If not found, it tries to see if the path is a directory (`$uri/`).
-        #   3. If both fail, it passes the request internally to `/index.php` to let
-        #      WordPress's router handle it.
+        # --- Request Routing ---
+
+        # The default location block that handles all incoming requests.
+        # WHAT: Tries to serve a static file or directory that matches the URL.
+        # WHY:  This is the key to making WordPress's "pretty permalinks"
+        #       (e.g., /my-blog-post/) work. If no matching file is found
+        #       (like /my-blog-post.html), it passes the request to
+        #       /index.php, allowing WordPress's router to handle it.
         location / {
             try_files $uri $uri/ /index.php?$args;
         }
 
-        # `location ~ \.php$`: This block handles all requests that end in `.php`.
-        #   - `~`: Specifies a case-sensitive regular expression match.
-        #   - `\.php$`: The regular expression for "ends with '.php'".
+        # This block handles all requests for files ending in .php.
+        # WHAT: Passes the request to the WordPress container for processing.
+        # WHY:  Nginx cannot execute PHP code itself. It acts as a proxy,
+        #       forwarding the request to a service that can: PHP-FPM.
         location ~ \.php$ {
-            # `include fastcgi_params;`: Includes a standard file containing common
-            #   parameters required for the FastCGI protocol to work.
             include fastcgi_params;
-            # `fastcgi_pass wordpress:9000;`: This is the most important line. It tells Nginx
-            #   to pass the request to a FastCGI server (your PHP-FPM service) located at
-            #   the hostname `wordpress` on port `9000`.
+            # This is the most critical line: it tells Nginx to pass the
+            # request to the PHP-FPM service running in the 'wordpress'
+            # container on its standard port, 9000.
             fastcgi_pass wordpress:9000;
+            # Specifies the default file if the script name is empty.
             fastcgi_index index.php;
-            # `fastcgi_param SCRIPT_FILENAME ...`: This sets a parameter that tells
-            #   PHP-FPM the absolute path on the filesystem to the PHP script that
-            #   needs to be executed.
+            # Sets a variable that tells PHP-FPM the exact path of the script to execute.
             fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         }
     }

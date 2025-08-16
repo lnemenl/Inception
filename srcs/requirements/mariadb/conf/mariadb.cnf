@@ -1,83 +1,33 @@
-#
-# This is the primary configuration file for the MariaDB server. It uses a standard
-# INI format, which is organized into sections denoted by square brackets `[]`.
-#
+# -----------------------------------------------------------------------------
+# This file provides the core configuration for the MariaDB server daemon.
+# These settings override the default values to ensure security and proper
+# network functionality within our Docker environment.
+# -----------------------------------------------------------------------------
 
-#
-# `[mysqld]` is the section header for the MariaDB server process. The 'd' at the end of `mysqld`
-# stands for "daemon", which is a program that runs continuously in the background to handle requests.
-# All settings listed below this header apply specifically to the server daemon itself.
-#
+# This section contains settings for the MariaDB server process (mysqld).
 [mysqld]
 
-#
-# WHAT IS A DAEMON?
-# A daemon is a computer program that runs as a background process, rather than being
-# under the direct control of an interactive user. Think of it like the services on your
-# phone or computer that are always running in the background to check for notifications,
-# sync files, or handle network connections.
-#
-# The MariaDB server (`mysqld`) and the Nginx web server are classic examples of daemons.
-# Their job is to start up and then run continuously, listening for incoming requests.
-#
-# DAEMONS AND DOCKER (IMPORTANT!)
-# Docker requires a container's main process to run in the FOREGROUND. If a program
-# behaves like a traditional daemon (by detaching and running in the background), Docker
-# will think the program has finished and will immediately shut down the container.
-# This is why there are special flags in this project, like `nginx -g 'daemon off;'`.
-# These flags explicitly tell the program NOT to daemonize, so Docker can manage it correctly.
-#
-
-#
-# `user = mysql`: This directive specifies the system user account that the MariaDB
-#   server process will run as after it starts.
-# HOW IT WORKS: The process initially starts with higher privileges, then "drops" them
-#   and switches to the `mysql` user.
-# WHY: This is a critical security best practice called the "Principle of Least Privilege".
-#   If a hacker were to exploit a vulnerability in MariaDB, they would only gain the
-#   limited permissions of the `mysql` user, not the all-powerful `root` user. This
-#   contains the potential damage to just the database files. The `mysql` user is a
-#   standard, unprivileged account created automatically when the MariaDB package is installed.
-#
+# WHAT FOR: This is a critical security measure. It forces the MariaDB server
+#           to run as the unprivileged 'mysql' user instead of 'root'. If the
+#           server were ever compromised, the attacker's permissions would be
+#           limited, preventing them from taking over the entire container.
 user = mysql
 
-#
-# `datadir = /var/lib/mysql`: This directive sets the path to the data directory.
-# HOW IT WORKS: MariaDB stores all of its data—databases, tables, indexes, and logs—in this
-#   folder. This is the exact path inside the container that my persistent volume from the
-#   host is mounted to, as defined in `docker-compose.yml`.
-# WHY: This is the crucial link that makes the database data persistent. It ensures that
-#   all data is saved to host machine and will survive if the container is deleted or re-created.
-#
+# WHAT FOR: This specifies the directory where all database data (tables, logs)
+#           is stored. This path corresponds to the mount point of our
+#           persistent volume, ensuring data survives container restarts.
 datadir = /var/lib/mysql
 
-#
-# `socket = /run/mysqld/mysqld.sock`: This defines the path for the Unix domain socket file.
-# HOW IT WORKS: A socket is a special file that allows processes on the same machine (inside the
-#   same container) to communicate very efficiently without using the network. Command-line
-#   tools like `mariadb-admin` use this socket to connect to the server.
-# WHY: It's the standard and highest-performance method for local communication within the container.
-#
+# Defines the path for the Unix socket file, used for efficient local
+# connections from within the container (e.g., by command-line tools).
 socket = /run/mysqld/mysqld.sock
 
-#
-# `port = 3306`: This specifies the TCP network port the server will listen on.
-# HOW IT WORKS: The server will "bind" to this port and listen for incoming connections from
-#   other services on the network (like WordPress container).
-# WHY: Port 3306 is the official, industry-standard port for both MariaDB and MySQL.
-#   Using the standard port simplifies configuration, as clients will try to connect to it by default.
-#
+# Sets the standard TCP network port for MariaDB.
 port = 3306
 
-#
-# `bind-address = 0.0.0.0`: This is a critical networking directive that controls which
-#   network interfaces the server listens on for the port specified above.
-# HOW IT WORKS:
-#   - `127.0.0.1` (localhost, often the default) would mean "only accept connections from inside this container".
-#   - `0.0.0.0` means "accept connections on all available network interfaces".
-# WHY: This is MANDATORY for the project. The WordPress container needs to connect to the
-#   MariaDB container over the virtual Docker network. Setting `bind-address` to `0.0.0.0`
-#   makes the server accessible to other containers on that network. Without this line, the
-#   connection from WordPress would be refused.
-#
+# WHAT FOR: This setting is MANDATORY for inter-container communication. It
+#           tells the server to listen for connections on all available
+#           network interfaces. The default is often '127.0.0.1' (localhost),
+#           which would prevent the WordPress container from being able to
+#           connect to the database over the Docker network.
 bind-address = 0.0.0.0

@@ -1,57 +1,51 @@
-# This tells the system to execute this script using the bash shell.
 #!/bin/bash
+# -----------------------------------------------------------------------------
+# This script automates the initial project setup. It's designed to be run
+# only once by the Makefile to generate all necessary dynamic and secret
+# configuration files.
+# -----------------------------------------------------------------------------
 
-# `set -e` is a shell command that ensures the script will exit immediately
-# if any command fails (exits with a non-zero status). This is a best practice
-# for preventing unexpected behavior from partial script execution.
-#
+# Exit immediately if any command fails to ensure a clean setup or none at all.
 set -e
 
+# --- Configuration Paths ---
 SECRETS_DIR="secrets"
 ENV_FILE="srcs/.env"
-
-# `${HOME}` is a standard environment variable that automatically expands
-# to the current user's home directory (e.g., /home/user or /Users/user).
-#
 DATA_PATH="${HOME}/data"
 
 echo "🚀 Generating dynamic and randomized configuration..."
 
-# This is a shell variable assignment using "command substitution" `$(...)`.
-# The shell first executes the command inside the parentheses and then assigns its output
-# to the variable.
-# `openssl rand`: A command to generate cryptographically strong random bytes.
-# `-hex 4`: Specifies the output format as hexadecimal. `4` means 4 bytes, which
-#   results in 8 hexadecimal characters (e.g., a1b2c3d4).
-#
+# --- Generate Randomized Variables ---
+# WHAT: Create unique names for the database and WordPress users.
+# WHY:  Using randomized names instead of default values like 'wordpress' or
+#       'admin' is a security best practice that makes the system harder
+#       to guess for attackers.
 WORDPRESS_DATABASE_NAME="db_$(openssl rand -hex 4)"
 WORDPRESS_DATABASE_USER="user_$(openssl rand -hex 4)"
-WORDPRESS_ADMIN_USER="gandalf$(openssl rand -hex 4)"
+WORDPRESS_ADMIN_USER="gandalf$(openssl rand -hex 4)" # Avoids forbidden 'admin' usernames
 WORDPRESS_USER="user_$(openssl rand -hex 4)"
-
 LOGIN=$(whoami)
 DOMAIN_NAME="${LOGIN}.42.fr"
 
-# --- Create Data Directories ---
+# --- Create Data Directories on Host ---
+# WHAT: Create the directories on the host machine for persistent data storage.
+# WHY:  These directories must exist *before* Docker Compose tries to bind-mount
+#       them as volumes. 'sudo' is used as they are created in the user's
+#       home directory. 'chown' ensures the current user has ownership,
+#       preventing Docker permission errors.
 echo "🔑 You may be prompted for your password to create data directories."
-# `mkdir -p`: The `mkdir` command creates a directory. The `-p` flag tells it to create
-#   parent directories as needed and not to show an error if the directory already exists.
 sudo mkdir -p "${DATA_PATH}/mariadb"
 sudo mkdir -p "${DATA_PATH}/wordpress"
-#
-# `chown -R`: The `chown` command changes the owner of files and directories. The `-R` (recursive)
-#   flag makes it apply to the directory and everything inside it.
-# `$(whoami)`: This ensures the newly created directories are owned by the current user,
-#   which is crucial for preventing permission errors with Docker.
 sudo chown -R "$(whoami)" "${DATA_PATH}"
-# --- Create secrets directory ---
+
+# Create the local directory to store secret files.
 mkdir -p "$SECRETS_DIR"
-# --- Create .env File from Scratch ---
-# `cat > "$ENV_FILE" << EOL`: This is a "here document" (heredoc).
-# `cat > "$ENV_FILE"`: This tells the `cat` command to write its input into the file specified by `$ENV_FILE`.
-# `<< EOL`: This tells the shell to treat all the following lines as the input to the `cat` command,
-#   until it finds a line containing only `EOL` (End Of Line).
-# Inside the heredoc, variables like `${DOMAIN_NAME}` are expanded by the shell to their actual values.
+
+# --- Create .env Configuration File ---
+# WHAT: Generate the 'srcs/.env' file from a template.
+# WHY:  This file provides non-sensitive configuration to Docker Compose. Using
+#       a "here document" (heredoc) allows us to dynamically populate the
+#       file with the randomized variables generated above.
 cat > "$ENV_FILE" << EOL
 # Inception Project Environment Configuration
 # Generated on $(date)
@@ -72,15 +66,14 @@ WORDPRESS_USER=${WORDPRESS_USER}
 WORDPRESS_USER_EMAIL=${WORDPRESS_USER}@${DOMAIN_NAME}
 EOL
 
-# --- Create SECRET files for passwords ---
-# This line generates a random password and writes it to a file.
-# `openssl rand -base64 12`: Generates 12 random bytes and encodes them using Base64,
-#   which is a good format for passwords as it includes uppercase, lowercase, and numbers.
-# `|`: The pipe operator sends the output of the `openssl` command as the input to the `tr` command.
-# `tr -d '\n'`: The `tr` command deletes (`-d`) all newline characters (`\n`), ensuring the password
-#   is a single line.
-# `>`: The redirect operator. It writes the final output (the password) into the specified file.
-#
+# --- Create Secret Files for Passwords ---
+# WHAT: Generate strong, random passwords and save each to a separate file.
+# WHY:  These files are the source for the Docker Secrets. Storing each
+#       password in its own file is a security best practice that limits
+#       exposure.
+# HOW:  'openssl rand -base64' creates a strong, random password. The output
+#       is piped to 'tr -d '\n'' to remove any trailing newline characters,
+#       ensuring the secret is a single, clean string.
 openssl rand -base64 12 | tr -d '\n' > "${SECRETS_DIR}/db_root_password.txt"
 openssl rand -base64 12 | tr -d '\n' > "${SECRETS_DIR}/db_password.txt"
 openssl rand -base64 12 | tr -d '\n' > "${SECRETS_DIR}/wp_admin_password.txt"

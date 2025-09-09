@@ -18,41 +18,24 @@ A fully containerized WordPress environment powered by Docker Compose. This proj
 
 The application consists of three main services orchestrated by Docker Compose:
 
-```mermaid
-%%{ init: { 'theme': 'neutral' } }%%
-flowchart TB
-    subgraph Client [Client]
-        H[HTTPS Request]
-    end
-
-    subgraph Host [Host Machine Filesystem]
-        F1[~/data/wordpress/]
-        F2[~/data/mariadb/]
-    end
-
-    subgraph Nginx [NGINX - Reverse Proxy]
-        N443[Port 443]
-    end
-
-    subgraph WordPress [WordPress - PHP-FPM]
-        W9000[Port 9000]
-    end
-
-    subgraph MariaDB [MariaDB - Database]
-        M3306[Port 3306]
-    end
-
-    H --> Nginx
-    Nginx --> WordPress
-    WordPress --> MariaDB
-
-    %% Volumes
-    Nginx ---|read-only| Host
-    WordPress ---|read-write| F1
-    MariaDB ---|read-write| F2
-
+``` text
+  +-----------------+      +-----------------+      +-----------------+
+  |      NGINX      |----->|   WORDPRESS     |----->|     MARIADB     |
+  | (Reverse Proxy) |      |   (PHP-FPM)     |      |   (Database)    |
+  |   Port 443      |      |   Port 9000     |      |   Port 3306     |
+  +-----------------+      +-----------------+      +-----------------+
+        ^     |                    |                      |
+        |     | (read-only)        | (read-write)         | (read-write)
+        |     +--------------------+----------------------+
+        |                          |
++-------+--------------------------+--------------------------------------+
+|       |                                                                 |
+|   HTTPS Request            HOST MACHINE FILESYSTEM                      |
+|                                                                         |
+|                            - ~/data/wordpress/                          |
+|                            - ~/data/mariadb/                            |
++-------------------------------------------------------------------------+
 ```
-
 
 * **Nginx**: The public-facing entry point. It serves static content, terminates SSL/TLS, and acts as a reverse proxy, forwarding PHP requests to the WordPress service.
 * **WordPress**: Runs the core application using PHP-FPM. It communicates with the MariaDB container for all database operations and uses WP-CLI for a fully automated, non-interactive installation.

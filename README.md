@@ -14,7 +14,7 @@ A fully containerized WordPress environment powered by Docker Compose. This proj
 
 ***
 
-## 🏗️ Project Architecture
+## Project Architecture
 
 The application consists of three main services orchestrated by Docker Compose:
 
@@ -43,7 +43,7 @@ The application consists of three main services orchestrated by Docker Compose:
 
 ***
 
-## 🛠️ Prerequisites
+## Prerequisites
 
 Before you begin, ensure you have the following installed:
 * **Docker Engine**
@@ -52,7 +52,7 @@ Before you begin, ensure you have the following installed:
 
 ***
 
-## 🏁 Quick Start
+## Quick Start
 
 1.  **Clone the repository:**
     ```bash
@@ -71,7 +71,7 @@ Before you begin, ensure you have the following installed:
 
 ***
 
-## ⚙️ Makefile Commands
+## Makefile Commands
 
 A convenient `Makefile` is included to manage the application's lifecycle.
 
